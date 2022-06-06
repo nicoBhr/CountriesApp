@@ -4,20 +4,19 @@ const { Op } = require("sequelize");
 
 const getCountriesFromApi = async () => {
   try {
-    let countriesFromApi = await axios.get("https://restcountries.com/v3/all")
-      .data;
+    let countriesFromApi = await axios.get("https://restcountries.com/v3/all");
     countriesFromApi = await Promise.all(
-      countriesFromApi.map((country) => {
+      countriesFromApi.data.map((country) => {
         Country.findOrCreate({
           where: {
             id: country.cca3,
             name: country.name.common,
-            flag: country.flag[1],
+            flag: country.flags[1],
             continent: country.continents[0],
-            capital: country.capital[0],
-            Subregion: country.subregion,
-            area: country.area,
-            population: country.population,
+            capital: country.capital ? country.capital[0] : "Not found",
+            subregion: country.subregion ? country.subregion : "Not found",
+            area: country.area ? country.area : 0,
+            population: country.population ? country.population : 0,
           },
         });
       })
@@ -31,13 +30,13 @@ const getCountriesFromApi = async () => {
 const getCountriesById = async (req, res) => {
   try {
     const { id } = req.params;
-    const countryId = await Country.findByPk(id.toUpperCase, {
+    let countryId = await Country.findByPk(id.toUpperCase(), {
       attributes: [
         "name",
         "flag",
         "continent",
         "capital",
-        "Subregion",
+        "subregion",
         "area",
         "population",
       ],
@@ -50,6 +49,7 @@ const getCountriesById = async (req, res) => {
 };
 
 const getCountriesByName = async (req, res) => {
+  await getCountriesFromApi();
   try {
     const { name } = req.query;
     if (name) {
@@ -59,28 +59,29 @@ const getCountriesByName = async (req, res) => {
           "flag",
           "continent",
           "capital",
-          "Subregion",
+          "subregion",
           "area",
           "population",
         ],
         where: {
           name: {
-            [Op.like]: `%${name}%`,
+            [Op.iLike]: `%${name}%`,
           },
         },
         include: Activity,
       });
-      countryFoundByName
-        ? res.send(countryFoundByName)
-        : res.status(400).send("Country not found");
+      countryFoundByName.length > 0
+        ? res.status(200).send(countryFoundByName)
+        : res.status(404).send("Country not found");
     } else {
       const allCountries = await Country.findAll({
         attributes: [
+          "id",
           "name",
           "flag",
           "continent",
           "capital",
-          "Subregion",
+          "subregion",
           "area",
           "population",
         ],
